@@ -38,7 +38,7 @@ int HT_CreateIndex (
     if ((error = BF_AllocateBlock(index_descriptor)) < 0)
         return error;
 
-    void* block = malloc(BLOCK_SIZE);
+    void* block = __MALLOC_BYTES(BLOCK_SIZE);
     if (block == NULL)
         return BFE_NOMEM;
 
