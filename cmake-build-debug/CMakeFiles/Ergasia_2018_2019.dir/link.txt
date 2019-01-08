@@ -1,1 +1,0 @@
-/usr/bin/cc -g   CMakeFiles/Ergasia_2018_2019.dir/main.c.o  -o Ergasia_2018_2019 
