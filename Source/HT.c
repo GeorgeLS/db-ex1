@@ -1,7 +1,8 @@
 
 #include <memory.h>
-#include "HT.h"
-#include "BF.h"
+#include "../Include/HT.h"
+#include "../Include/BF.h"
+#include "../Include/macros.h"
 
 /**
  * HT_CreateIndex - Creates an index file
@@ -44,12 +45,13 @@ int HT_CreateIndex (
     if ((error = BF_ReadBlock(index_descriptor, 0, &block)) < 0)
         return error;
 
-    HT_info ht_info;
-    ht_info.index_descriptor = index_descriptor;
-    ht_info.attribute_type = attribute_type;
-    ht_info.attribute_name = attribute_name;
-    ht_info.attribute_length = attribute_length;
-    ht_info.bucket_n = bucket_n;
+    HT_info ht_info = {
+            .index_descriptor = index_descriptor,
+            .attribute_type = attribute_type,
+            .attribute_name = attribute_name,
+            .attribute_length = (size_t) attribute_length,
+            .bucket_n = (unsigned long) bucket_n
+    };
 
     memcpy(block, &ht_info, sizeof(HT_info));
     if ((error = BF_WriteBlock(index_descriptor, 0)) < 0)
@@ -83,7 +85,7 @@ HT_info* HT_OpenIndex(char* index_name)
     if ((BF_ReadBlock(index_descriptor, 0, &block)) < 0)
         return NULL;
 
-    HT_info* ht_info = malloc(sizeof(HT_info));
+    HT_info* ht_info = __MALLOC(1, HT_info);
     memcpy(ht_info, block, sizeof(HT_info));
     // @TODO Ο Γιαννης μου είπε να ελεγχουμε εδώ εαν το αρχείο
     // @TODO είναι αρχείο κατακερματισμού και όχι οποιοδήποτε αρχείο.
