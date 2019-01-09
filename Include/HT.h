@@ -37,10 +37,16 @@ __NO_DISCARD HT_info *HT_OpenIndex(char *index_name) __NON_NULL(1);
 /**
  * HT_CloseIndex - Closes the index file associated with the file descriptor
  * in the HT_info object
- * @param header_info A pointer to a HT_info object
+ * @param header_info A pointer to an HT_info object
  * @return On success returns 0
  * On failure returns -1
  */
 __NO_DISCARD int HT_CloseIndex(HT_info *header_info);
+
+/**
+ * HT_Print - Prints the header info
+ * @param info A pointer to an HT_info object
+ */
+void HT_Print(HT_info *info);
 
 #endif //HT_H
