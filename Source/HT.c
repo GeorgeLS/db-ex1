@@ -6,7 +6,6 @@
 #include "../Include/macros.h"
 
 typedef struct HT_info_ {
-  const char* file_identifier;
   int index_descriptor;
   char attribute_type;
   size_t attribute_length;
@@ -20,20 +19,20 @@ static __INLINE inline uint64_t hash_function(const HT_info *restrict ht_info, c
     size_t value_len = strlen(value);
     size_t i = 0U;
     for (; i <= value_len; i += sizeof(uint64_t)) {
-      hash_value += *(uint64_t*)value;
+      hash_value += *(uint64_t *) value;
       value += sizeof(uint64_t);
     }
     if (value_len % sizeof(uint64_t) != 0U) {
-      hash_value += *(uint64_t*)value;
+      hash_value += *(uint64_t *) value;
     }
     hash_value %= ht_info->bucket_n;
   } else {
-    hash_value = *(uint64_t*)value % ht_info->bucket_n;
+    hash_value = *(uint64_t *) value % ht_info->bucket_n;
   }
   return hash_value;
 }
 
-static __INLINE inline void HT_info_copy_to_block(HT_info *ht_info, void *block) {
+static __INLINE inline void HT_info_copy_to_block(HT_info *ht_info, void *restrict block) {
   size_t offset = offsetof(HT_info, attribute_name);
   memcpy(block, &ht_info, offset);
   block += offset;
@@ -43,7 +42,7 @@ static __INLINE inline void HT_info_copy_to_block(HT_info *ht_info, void *block)
          sizeof(HT_info) - offsetof(HT_info, bucket_n));
 }
 
-static __INLINE inline void copy_block_to_HT_info(HT_info *info, void *block) {
+static __INLINE inline void copy_block_to_HT_info(HT_info *restrict info, void *restrict block) {
   size_t offset = offsetof(HT_info, attribute_name);
   memcpy(info, block, offset);
   block += offset;
@@ -85,13 +84,16 @@ int HT_CreateIndex(
     return error;
 
   HT_info ht_info = {
-          .file_identifier = HT_FILE_IDENTIFIER,
           .index_descriptor = index_descriptor,
           .attribute_type = attribute_type,
           .attribute_name = attribute_name,
           .attribute_length = (size_t) attribute_length,
           .bucket_n = (unsigned long) bucket_n
   };
+
+  size_t identifier_len = strlen(HT_FILE_IDENTIFIER);
+  memcpy(block, HT_FILE_IDENTIFIER, identifier_len);
+  block += identifier_len;
 
   HT_info_copy_to_block(&ht_info, block);
 
@@ -116,10 +118,14 @@ HT_info *HT_OpenIndex(char *index_name) {
   if ((BF_ReadBlock(index_descriptor, 0, &block)) < 0)
     return NULL;
 
+  size_t identifier_len = strlen(HT_FILE_IDENTIFIER);
+  if (!memcmp(block, HT_FILE_IDENTIFIER, identifier_len)) {
+    return NULL;
+  }
+  block += identifier_len;
+
   HT_info *ht_info = __MALLOC(1, HT_info);
   copy_block_to_HT_info(ht_info, block);
-  if (ht_info->file_identifier != HT_FILE_IDENTIFIER)
-    return NULL;
 
   return ht_info;
 }
