@@ -6,6 +6,7 @@
 #include "../Include/macros.h"
 
 typedef struct HT_info_ {
+  const char* file_identifier;
   int index_descriptor;
   char attribute_type;
   size_t attribute_length;
@@ -84,6 +85,7 @@ int HT_CreateIndex(
     return error;
 
   HT_info ht_info = {
+          .file_identifier = HT_FILE_IDENTIFIER,
           .index_descriptor = index_descriptor,
           .attribute_type = attribute_type,
           .attribute_name = attribute_name,
@@ -116,8 +118,9 @@ HT_info *HT_OpenIndex(char *index_name) {
 
   HT_info *ht_info = __MALLOC(1, HT_info);
   copy_block_to_HT_info(ht_info, block);
-  // @TODO Ο Γιαννης μου είπε να ελεγχουμε εδώ εαν το αρχείο
-  // @TODO είναι αρχείο κατακερματισμού και όχι οποιοδήποτε αρχείο.
+  if (ht_info->file_identifier != HT_FILE_IDENTIFIER)
+    return NULL;
+
   return ht_info;
 }
 
