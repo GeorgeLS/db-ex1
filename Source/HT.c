@@ -8,8 +8,8 @@
 typedef struct HT_info_ {
   int index_descriptor;
   char attribute_type;
-  char *attribute_name;
   size_t attribute_length;
+  char *attribute_name;
   unsigned long int bucket_n;
 } HT_info;
 
@@ -20,7 +20,20 @@ static __INLINE inline void HT_info_copy_to_block(HT_info *ht_info, void *block)
   memcpy(block, ht_info->attribute_name, (size_t) ht_info->attribute_length);
   block += ht_info->attribute_length;
   memcpy(block, BYTE_POINTER(ht_info) + offset + ht_info->attribute_length,
-         sizeof(HT_info) - offsetof(HT_info, attribute_length));
+         sizeof(HT_info) - offsetof(HT_info, bucket_n));
+}
+
+static __INLINE inline void copy_block_to_HT_info(HT_info *info, void *block) {
+  size_t offset = offsetof(HT_info, attribute_name);
+  memcpy(info, block, offset);
+  block += offset;
+  char *name = __MALLOC(info->attribute_length + 1, char);
+  memcpy(name, block, info->attribute_length);
+  name[info->attribute_length] = '\0';
+  info->attribute_name = name;
+  block += info->attribute_length;
+  memcpy(BYTE_POINTER(info) + offset + info->attribute_length,
+         block, sizeof(HT_info) - offsetof(HT_info, bucket_n));
 }
 
 int HT_CreateIndex(
@@ -83,7 +96,7 @@ HT_info *HT_OpenIndex(char *index_name) {
     return NULL;
 
   HT_info *ht_info = __MALLOC(1, HT_info);
-  memcpy(ht_info, block, sizeof(HT_info));
+  copy_block_to_HT_info(ht_info, block);
   // @TODO Ο Γιαννης μου είπε να ελεγχουμε εδώ εαν το αρχείο
   // @TODO είναι αρχείο κατακερματισμού και όχι οποιοδήποτε αρχείο.
   return ht_info;
