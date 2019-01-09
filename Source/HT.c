@@ -1,5 +1,6 @@
 
 #include <memory.h>
+#include <stddef.h>
 #include "../Include/HT.h"
 #include "../Include/BF.h"
 #include "../Include/macros.h"
@@ -12,7 +13,7 @@
  * @param attribute_type  A character indicating key type.
  * @param attribute_name  A string of the key name.
  * @param attribute_length  The length of the key type in bytes.
- * @param buckets  The number of buckets for the hash index.
+ * @param bucket_n  The number of buckets for the hash index.
  * @return  On success returns 0.
  * On failure returns the error values defined in BF.h
  */
@@ -46,6 +47,7 @@ int HT_CreateIndex (
         return error;
 
     HT_info ht_info = {
+            .file_identifier = HT_FILE_IDENTIFIER,
             .index_descriptor = index_descriptor,
             .attribute_type = attribute_type,
             .attribute_name = attribute_name,
@@ -56,6 +58,13 @@ int HT_CreateIndex (
     memcpy(block, &ht_info, sizeof(HT_info));
     if ((error = BF_WriteBlock(index_descriptor, 0)) < 0)
         return error;
+
+    int j;
+    for (j = 0; j < bucket_n; j++)
+    {
+        if ((error = BF_AllocateBlock(index_descriptor)) < 0)
+            return error;
+    }
 
     if ((error = BF_CloseFile(index_descriptor)) < 0)
         return error;
@@ -78,7 +87,7 @@ HT_info* HT_OpenIndex(char* index_name)
     if ((index_descriptor = BF_OpenFile(index_name)) < 0)
         return NULL;
 
-    void* block = malloc(BLOCK_SIZE);
+    void* block = __MALLOC_BYTES(BLOCK_SIZE);
     if (block == NULL)
         return NULL;
 
@@ -87,9 +96,36 @@ HT_info* HT_OpenIndex(char* index_name)
 
     HT_info* ht_info = __MALLOC(1, HT_info);
     memcpy(ht_info, block, sizeof(HT_info));
-    // @TODO Ο Γιαννης μου είπε να ελεγχουμε εδώ εαν το αρχείο
-    // @TODO είναι αρχείο κατακερματισμού και όχι οποιοδήποτε αρχείο.
+    if (ht_info->file_identifier != HT_FILE_IDENTIFIER)
+        return NULL;
+
     return ht_info;
 }
 
 
+/**
+ * HT_CloseIndex - Closes the index file.
+ *
+ * @param header_info The object that specifies the index file.
+ * @return On success returns 0, otherwise -1.
+ */
+int HT_CloseIndex(HT_info* header_info)
+{
+    if (BF_CloseFile(header_info->index_descriptor) < 0)
+        return -1;
+
+    free(header_info);
+    return 0;
+}
+
+
+int HT_InsertEntry(HT_info header_info, Record record)
+{
+
+}
+
+
+void set_value_to_struct_field(void* object, void* value, const char* field_name)
+{
+    int offsetf = offsetof(object, field_name);
+}

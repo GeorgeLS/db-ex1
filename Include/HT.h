@@ -8,8 +8,10 @@
 #include <stdlib.h>
 
 #define HT_BLOCK_OVERFLOW -24
+#define HT_FILE_IDENTIFIER "STATIC_HASH_TABLE"
 
 typedef struct {
+    const char* file_identifier;
     int index_descriptor;
     char attribute_type;
     char* attribute_name;
