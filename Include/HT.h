@@ -5,6 +5,7 @@
 #include "attributes.h"
 
 #define HT_BLOCK_OVERFLOW -24
+#define HT_FILE_IDENTIFIER "STATIC_HASH_TABLE"
 
 typedef struct HT_info_ HT_info;
 
