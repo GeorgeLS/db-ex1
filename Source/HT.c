@@ -13,6 +13,25 @@ typedef struct HT_info_ {
   unsigned long int bucket_n;
 } HT_info;
 
+static __INLINE inline uint64_t hash_function(const HT_info *restrict ht_info, const void *restrict value) {
+  uint64_t hash_value = 0U;
+  if (ht_info->attribute_type == 'c') {
+    size_t value_len = strlen(value);
+    size_t i = 0U;
+    for (; i <= value_len; i += sizeof(uint64_t)) {
+      hash_value += *(uint64_t*)value;
+      value += sizeof(uint64_t);
+    }
+    if (value_len % sizeof(uint64_t) != 0U) {
+      hash_value += *(uint64_t*)value;
+    }
+    hash_value %= ht_info->bucket_n;
+  } else {
+    hash_value = *(uint64_t*)value % ht_info->bucket_n;
+  }
+  return hash_value;
+}
+
 static __INLINE inline void HT_info_copy_to_block(HT_info *ht_info, void *block) {
   size_t offset = offsetof(HT_info, attribute_name);
   memcpy(block, &ht_info, offset);
@@ -108,5 +127,7 @@ int HT_CloseIndex(HT_info *header_info) {
   if ((error = BF_CloseFile(header_info->index_descriptor)) < 0) {
     return error;
   }
+  free(header_info->attribute_name);
   free(header_info);
+  return 0;
 }
