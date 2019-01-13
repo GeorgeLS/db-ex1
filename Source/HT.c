@@ -32,9 +32,9 @@ bucket_info_t create_bucket_info(void) {
 }
 
 static __INLINE inline
-uint64_t hash_function(const HT_info *restrict ht_info, const void *restrict value) {
+uint64_t hash_function(char attribute_type, size_t bucket_n, const void *restrict value) {
   uint64_t hash_value = 0U;
-  if (ht_info->attribute_type == 'c') {
+  if (attribute_type == 'c') {
     size_t value_len = strlen(value);
     size_t double_words = value_len / sizeof(uint64_t);
     for (size_t i = 0U; i != double_words; ++i) {
@@ -45,9 +45,9 @@ uint64_t hash_function(const HT_info *restrict ht_info, const void *restrict val
     for (size_t i = 0U; i != remaining_bytes; ++i) {
       hash_value += *(uint8_t *) value;
     }
-    hash_value %= ht_info->bucket_n;
+    hash_value %= bucket_n;
   } else {
-    hash_value = (*(int *) value) % ht_info->bucket_n;
+    hash_value = (*(int *) value) % bucket_n;
   }
   return hash_value + 1U;
 }
@@ -163,7 +163,7 @@ int HT_CloseIndex(HT_info *header_info) {
 
 int HT_InsertEntry(HT_info header_info, Record record) {
   int index_descriptor = header_info.index_descriptor;
-  int bucket = (int) hash_function(&header_info, &record.id);
+  int bucket = (int) hash_function(header_info.attribute_type, header_info.bucket_n, &record.id);
   void *block;
   CHECK(BF_ReadBlock(index_descriptor, bucket, &block), BF_READ_BLOCK_EMSG, return -1);
   bucket_info_t bucket_info = *(bucket_info_t *) block;
@@ -199,7 +199,7 @@ int HT_InsertEntry(HT_info header_info, Record record) {
 int HT_DeleteEntry(HT_info header_info, void *value) {
   int id = *(int *) value;
   int index_descriptor = header_info.index_descriptor;
-  int bucket = (int) hash_function(&header_info, value);
+  int bucket = (int) hash_function(header_info.attribute_type, header_info.bucket_n, value);
   size_t i;
   void *block;
   void *block_base;
@@ -230,7 +230,7 @@ __SEARCH_END:;
 int HT_GetAllEntries(HT_info header_info, void *value) {
   int id = *(int *) value;
   int index_descriptor = header_info.index_descriptor;
-  int bucket = (int) hash_function(&header_info, value);
+  int bucket = (int) hash_function(header_info.attribute_type, header_info.bucket_n, value);
   int blocks_read = 0U;
   do {
     void *block;
