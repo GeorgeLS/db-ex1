@@ -23,6 +23,7 @@ void test1(void) {
     snprintf(record.surname, sizeof(record.surname), "Surname_%zu", i);
     snprintf(record.address, sizeof(record.address), "Address_%zu", i);
     int res = HT_InsertEntry(*info, record);
+    printf("Insert res = %d\n", res);
   }
   Record record = {.id = 25, .name = "Name_25", .surname = "Surname_25", .address = "Address_25"};
   int res = HT_GetAllEntries(*info, &record.id);

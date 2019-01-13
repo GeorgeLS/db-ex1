@@ -172,6 +172,7 @@ int HT_InsertEntry(HT_info header_info, Record record) {
       memcpy(block, &bucket_info, sizeof(bucket_info_t));
       CHECKED_BF_WRITE_BLOCK_GOTO(index_descriptor, current_bucket, __ERROR);
       CHECKED_BF_READ_BLOCK_GOTO(index_descriptor, bucket_info.overflow_bucket, block, __ERROR);
+      current_bucket = bucket_info.overflow_bucket;
       initialize_block(block);
       CHECKED_BF_WRITE_BLOCK_GOTO(header_info.index_descriptor, bucket_info.overflow_bucket, __ERROR);
       bucket_info = *(bucket_info_t *) block;
@@ -184,7 +185,7 @@ int HT_InsertEntry(HT_info header_info, Record record) {
   ++bucket_info.record_n;
   memcpy(block, &bucket_info, sizeof(bucket_info_t));
   CHECKED_BF_WRITE_BLOCK_GOTO(index_descriptor, bucket, __ERROR);
-  return 0;
+  return current_bucket;
 __ERROR:
   return -1;
 }

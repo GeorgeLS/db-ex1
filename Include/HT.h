@@ -54,7 +54,7 @@ __NO_DISCARD int HT_CloseIndex(HT_info *header_info);
  * HT_InsertEntry - Inserts a new entry to the index file associated with header info
  * @param header_info The header info
  * @param record The record to insert
- * @return On success returns 0
+ * @return On success returns the block number that the record got inserted
  * On failure returns -1
  */
 __NO_DISCARD int HT_InsertEntry(HT_info header_info, Record record);
