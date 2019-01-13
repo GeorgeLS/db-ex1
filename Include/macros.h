@@ -13,6 +13,7 @@
 do { \
   int ret_val = (res); \
   if (ret_val < 0) { \
+    fprintf(stderr, "%s returned %d on file <%s> on line %d\n", #res, ret_val, __FILE__, __LINE__); \
     BF_PrintError(error_message); \
     on_error; \
   } \
