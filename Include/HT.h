@@ -3,11 +3,18 @@
 
 #include <stdlib.h>
 #include "attributes.h"
+#include "record.h"
 
 #define HT_BLOCK_OVERFLOW -24
 #define HT_FILE_IDENTIFIER "STATIC_HASH_TABLE"
 
-typedef struct HT_info_ HT_info;
+typedef struct HT_info_ {
+  int index_descriptor;
+  char attribute_type;
+  size_t attribute_length;
+  char *attribute_name;
+  unsigned long int bucket_n;
+} HT_info;
 
 /**
  * HT_CreateIndex - Creates an index file
@@ -42,6 +49,15 @@ __NO_DISCARD HT_info *HT_OpenIndex(char *index_name) __NON_NULL(1);
  * On failure returns -1
  */
 __NO_DISCARD int HT_CloseIndex(HT_info *header_info);
+
+/**
+ * HT_InsertEntry - Inserts a new entry to the index file associated with header info
+ * @param header_info The header info
+ * @param record The record to insert
+ * @return On success return 0
+ * On failure returns -1
+ */
+__NO_DISCARD int HT_InsertEntry(HT_info header_info, Record record);
 
 /**
  * HT_Print - Prints the header info
