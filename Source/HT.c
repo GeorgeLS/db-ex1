@@ -210,8 +210,7 @@ int HT_DeleteEntry(HT_info header_info, void *value) {
     block_base = block;
     block += sizeof(bucket_info_t);
     for (i = 0U; i != bucket_info.record_n; ++i, block += sizeof(Record)) {
-      Record record = *(Record *) block;
-      if (record.id == id) goto __SEARCH_END;
+      if (((Record *) block)->id == id) goto __SEARCH_END;
     }
     if (bucket_info.overflow_bucket == -1) return -1;
     bucket = bucket_info.overflow_bucket;
