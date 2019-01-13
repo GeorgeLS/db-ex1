@@ -8,13 +8,22 @@
 #define HT_BLOCK_OVERFLOW -24
 #define HT_FILE_IDENTIFIER "STATIC_HASH_TABLE"
 
-typedef struct HT_info_ {
+typedef struct {
   int index_descriptor;
   char attribute_type;
   size_t attribute_length;
   char *attribute_name;
   unsigned long int bucket_n;
 } HT_info;
+
+typedef struct {
+  int secondary_index_descriptor;
+  size_t attribute_length;
+  char *attribute_name;
+  unsigned long int bucket_n;
+  size_t index_name_length;
+  char *index_name;
+} SHT_info;
 
 /**
  * HT_CreateIndex - Creates an index file
@@ -76,5 +85,20 @@ __NO_DISCARD int HT_DeleteEntry(HT_info header_info, void *value) __NON_NULL(2);
  * On failure returns -1
  */
 __NO_DISCARD int HT_GetAllEntries(HT_info header_info, void *value) __NON_NULL(2);
+
+/**
+ * SHT_CreateSecondaryIndex - Creates a secondary index file for the primary index file
+ * implementing static hashing techniques.
+ *
+ * @param index_name  A string of the secondary index name.
+ * @param attribute_name  A string of the key name.
+ * @param attribute_length  The length of the key type in bytes.
+ * @param buckets  The number of buckets for the hash index.
+ * @param index_name The string of the primary index name.
+ * @return  On success returns 0.
+ * On failure returns the error values defined in BF.h
+ */
+__NO_DISCARD int SHT_CreateSecondaryIndex(char *secondary_index_name, char *attribute_name,
+                                          int attribute_length, int bucket_n, char *index_name) __NON_NULL(1, 2, 5);
 
 #endif //HT_H
