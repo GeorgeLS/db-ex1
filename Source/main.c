@@ -1,7 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <memory.h>
 #include "../Include/BF.h"
 #include "../Include/HT.h"
+#include "../Include/macros.h"
 
 void test1(void) {
   char filename[] = "test_file";
@@ -15,7 +17,6 @@ void test1(void) {
     BF_PrintError("Error retrieving index");
     exit(EXIT_FAILURE);
   }
-  HT_Print(info);
   for (size_t i = 0U; i != 100U; ++i) {
     Record record = {.id = (int) i};
     snprintf(record.name, sizeof(record.name), "Name_%zu", i);
@@ -23,6 +24,12 @@ void test1(void) {
     snprintf(record.address, sizeof(record.address), "Address_%zu", i);
     int res = HT_InsertEntry(*info, record);
   }
+  Record record = {.id = 25, .name = "Name_25", .surname = "Surname_25", .address = "Address_25"};
+  int res = HT_GetAllEntries(*info, &record.id);
+  printf("Res = %d\n", res);
+  res = HT_DeleteEntry(*info, &record.id);
+  res = HT_GetAllEntries(*info, &record.id);
+  printf("Res = %d\n", res);
   if (HT_CloseIndex(info) < 0) {
     BF_PrintError("Error closing file");
     exit(EXIT_FAILURE);

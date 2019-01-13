@@ -54,15 +54,27 @@ __NO_DISCARD int HT_CloseIndex(HT_info *header_info);
  * HT_InsertEntry - Inserts a new entry to the index file associated with header info
  * @param header_info The header info
  * @param record The record to insert
- * @return On success return 0
+ * @return On success returns 0
  * On failure returns -1
  */
 __NO_DISCARD int HT_InsertEntry(HT_info header_info, Record record);
 
 /**
- * HT_Print - Prints the header info
- * @param info A pointer to an HT_info object
+ * HT_DeleteEntry - Deletes the entry with id equal to value
+ * @param header_info The header info from which we take the static hashing file information
+ * @param value The value of the id of the Record to delete
+ * @return On success returns 0
+ * On failure returns -1
  */
-void HT_Print(HT_info *info);
+__NO_DISCARD int HT_DeleteEntry(HT_info header_info, void *value) __NON_NULL(2);
+
+/**
+ * HT_GetAllEntries - Prints all the records whose primary key is equal to value
+ * @param header_info The header info from which we take the static hashing file information
+ * @param value The value of the id of the Records to print
+ * @return On success returns the number of blocks read until we found all the records
+ * On failure returns -1
+ */
+__NO_DISCARD int HT_GetAllEntries(HT_info header_info, void *value) __NON_NULL(2);
 
 #endif //HT_H

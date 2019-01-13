@@ -24,13 +24,6 @@ bucket_info_t create_bucket_info(void) {
   };
 }
 
-static __NON_NULL(1) __NO_DISCARD __INLINE inline
-bucket_info_t get_bucket_info(void *block) {
-  bucket_info_t bucket_info;
-  memcpy(&bucket_info, block, sizeof(bucket_info_t));
-  return bucket_info;
-}
-
 static __INLINE inline
 uint64_t hash_function(const HT_info *restrict ht_info, const void *restrict value) {
   uint64_t hash_value = 0U;
@@ -162,9 +155,9 @@ __ERROR:
 
 int HT_InsertEntry(HT_info header_info, Record record) {
   int error;
+  int index_descriptor = header_info.index_descriptor;
   int bucket = (int) hash_function(&header_info, &record.id);
   void *block;
-  int index_descriptor = header_info.index_descriptor;
   CHECKED_BF_READ_BLOCK_GOTO(index_descriptor, bucket, block, __ERROR);
   bucket_info_t bucket_info = *(bucket_info_t *) block;
   int current_bucket = bucket;
@@ -196,8 +189,58 @@ __ERROR:
   return -1;
 }
 
-void HT_Print(HT_info *info) {
-  printf("FD = %d\tType = %c\tName = %s\tLength = %zu\tBuckets = %lu\n",
-         info->index_descriptor, info->attribute_type, info->attribute_name,
-         info->attribute_length, info->bucket_n);
+int HT_DeleteEntry(HT_info header_info, void *value) {
+  int error;
+  int id = *(int *) value;
+  int index_descriptor = header_info.index_descriptor;
+  int bucket = (int) hash_function(&header_info, value);
+  size_t i;
+  void *block;
+  void *block_base;
+  bucket_info_t bucket_info;
+  while (1U) {
+    CHECKED_BF_READ_BLOCK_GOTO(index_descriptor, bucket, block, __ERROR);
+    bucket_info = *(bucket_info_t *) block;
+    block_base = block;
+    block += sizeof(bucket_info_t);
+    for (i = 0U; i != bucket_info.record_n; ++i, block += sizeof(Record)) {
+      Record record = *(Record *) block;
+      if (record.id == id) goto __SEARCH_END;
+    }
+    if (bucket_info.overflow_bucket == -1) goto __ERROR;
+    bucket = bucket_info.overflow_bucket;
+  }
+__SEARCH_END:;
+  size_t remaining_records = bucket_info.record_n - i - 1;
+  memcpy(block, block + sizeof(Record), remaining_records * sizeof(Record));
+  bucket_info.next_record -= sizeof(Record);
+  bucket_info.free_space += sizeof(Record);
+  --bucket_info.record_n;
+  memcpy(block_base, &bucket_info, sizeof(bucket_info_t));
+  CHECKED_BF_WRITE_BLOCK_GOTO(index_descriptor, bucket, __ERROR);
+  return 0;
+__ERROR:
+  return error;
+}
+
+int HT_GetAllEntries(HT_info header_info, void *value) {
+  int error;
+  int id = *(int *) value;
+  int index_descriptor = header_info.index_descriptor;
+  int bucket = (int) hash_function(&header_info, value);
+  int blocks_read = 0U;
+  do {
+    void *block;
+    CHECKED_BF_READ_BLOCK_GOTO(index_descriptor, bucket, block, __ERROR);
+    bucket_info_t bucket_info = *(bucket_info_t *) block;
+    block += sizeof(bucket_info_t);
+    for (size_t i = 0U; i != bucket_info.record_n; ++i, block += sizeof(Record)) {
+      if (((Record*)block)->id == id) print_record(block);
+    }
+    bucket = bucket_info.overflow_bucket;
+    ++blocks_read;
+  } while (bucket != -1);
+  return blocks_read;
+__ERROR:
+  return error;
 }

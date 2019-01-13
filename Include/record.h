@@ -22,4 +22,10 @@ __NO_DISCARD Record create_record(int id, const char *restrict name,
                                   const char *restrict surname,
                                   const char *restrict address) __NON_NULL(2, 3, 4);
 
+/**
+ * print_record - Prints the information about the given record
+ * @param record The record whose information will be printed
+ */
+void print_record(Record *record) __NON_NULL(1);
+
 #endif //DB_EX1_RECORD_H
