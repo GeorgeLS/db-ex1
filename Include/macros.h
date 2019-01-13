@@ -9,4 +9,13 @@
   dest[len] = '\0'; \
 } \
 
+#define CHECK(res, error_message, on_error) \
+do { \
+  int ret_val = (res); \
+  if (ret_val < 0) { \
+    BF_PrintError(error_message); \
+    on_error; \
+  } \
+} while (0U) \
+
 #endif //DB_EX1_MACROS_H

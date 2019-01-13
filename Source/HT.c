@@ -5,7 +5,14 @@
 #include "../Include/HT.h"
 #include "../Include/BF.h"
 #include "../Include/macros.h"
-#include "../Include/bf_macros.h"
+
+#define BF_CREATE_EMSG "Error while creating file"
+#define BF_OPEN_EMSG "Error while opening file"
+#define BF_ALLOCATE_EMSG "Error while allocating block"
+#define BF_READ_BLOCK_EMSG "Error while reading block"
+#define BF_WRITE_BLOCK_EMSG "Error while writing block"
+#define BF_CLOSE_EMSG "Error while closing file"
+#define BF_GET_BLOCK_COUNTER_EMSG "Error while getting block counter"
 
 typedef struct {
   int overflow_bucket;
@@ -83,16 +90,13 @@ int HT_CreateIndex(char *index_name, char attribute_type, char *attribute_name,
                    int attribute_length, int bucket_n) {
 
   if (sizeof(HT_info) > BLOCK_SIZE) return HT_BLOCK_OVERFLOW;
-
-  int error;
   int index_descriptor = 0;
-
-  CHECKED_BF_CREATE_FILE_GOTO(index_name, __ERROR);
-  CHECKED_BF_OPEN_FILE_GOTO(index_name, index_descriptor, __ERROR);
+  CHECK(BF_CreateFile(index_name), BF_CREATE_EMSG, return -1);
+  CHECK(index_descriptor = BF_OpenFile(index_name), BF_OPEN_EMSG, return -1);
 
   void *block;
-  CHECKED_BF_ALLOCATE_BLOCK_GOTO(index_descriptor, __ERROR);
-  CHECKED_BF_READ_BLOCK_GOTO(index_descriptor, 0, block, __ERROR);
+  CHECK(BF_AllocateBlock(index_descriptor), BF_ALLOCATE_EMSG, return -1);
+  CHECK(BF_ReadBlock(index_descriptor, 0, &block), BF_READ_BLOCK_EMSG, return -1);
 
   HT_info ht_info = {
           .index_descriptor = index_descriptor,
@@ -107,74 +111,63 @@ int HT_CreateIndex(char *index_name, char attribute_type, char *attribute_name,
 
   HT_info_copy_to_block(&ht_info, block + identifier_len);
 
-  CHECKED_BF_WRITE_BLOCK_GOTO(index_descriptor, 0, __ERROR);
+  CHECK(BF_WriteBlock(index_descriptor, 0), BF_WRITE_BLOCK_EMSG, return -1);
   for (size_t i = 1U; i <= bucket_n; ++i) {
-    CHECKED_BF_ALLOCATE_BLOCK_GOTO(index_descriptor, __ERROR);
+    CHECK(BF_AllocateBlock(index_descriptor), BF_ALLOCATE_EMSG, return -1);
     void *bucket_block;
-    CHECKED_BF_READ_BLOCK_GOTO(index_descriptor, (int) i, bucket_block, __ERROR);
+    CHECK(BF_ReadBlock(index_descriptor, (int) i, &bucket_block), BF_READ_BLOCK_EMSG, return -1);
     initialize_block(bucket_block);
-    CHECKED_BF_WRITE_BLOCK_GOTO(index_descriptor, (int) i, __ERROR);
+    CHECK(BF_WriteBlock(index_descriptor, (int) i), BF_WRITE_BLOCK_EMSG, return -1);
   }
-
-  CHECKED_BF_CLOSE_FILE_GOTO(index_descriptor, __ERROR);
+  CHECK(BF_CloseFile(index_descriptor), BF_CLOSE_EMSG, return -1);
   return 0;
-__ERROR:
-  return error;
 }
 
 HT_info *HT_OpenIndex(char *index_name) {
-  int error;
-  HT_info *ht_info = NULL;
   int index_descriptor;
-  CHECKED_BF_OPEN_FILE_GOTO(index_name, index_descriptor, __EXIT);
+  CHECK(index_descriptor = BF_OpenFile(index_name), BF_OPEN_EMSG, return NULL);
 
   void *block;
-  CHECKED_BF_READ_BLOCK_GOTO(index_descriptor, 0, block, __EXIT);
+  CHECK(BF_ReadBlock(index_descriptor, 0, &block), BF_READ_BLOCK_EMSG, return NULL);
 
   size_t identifier_len = strlen(HT_FILE_IDENTIFIER);
-  if (memcmp(block, HT_FILE_IDENTIFIER, identifier_len) != 0) goto __EXIT;
+  if (memcmp(block, HT_FILE_IDENTIFIER, identifier_len) != 0) return NULL;
 
-  ht_info = __MALLOC(1, HT_info);
-  if (ht_info == NULL) goto __EXIT;
+  HT_info *ht_info = __MALLOC(1, HT_info);
+  if (ht_info == NULL) return NULL;
   copy_block_to_HT_info(ht_info, block + identifier_len);
-
-__EXIT:
   return ht_info;
 }
 
 int HT_CloseIndex(HT_info *header_info) {
   if (header_info == NULL) return -1;
-  int error;
-  CHECKED_BF_CLOSE_FILE_GOTO(header_info->index_descriptor, __ERROR);
+  CHECK(BF_CloseFile(header_info->index_descriptor), BF_CLOSE_EMSG, return -1);
   free(header_info->attribute_name);
   free(header_info);
   return 0;
-__ERROR:
-  return error;
 }
 
 int HT_InsertEntry(HT_info header_info, Record record) {
-  int error;
   int index_descriptor = header_info.index_descriptor;
   int bucket = (int) hash_function(&header_info, &record.id);
   void *block;
-  CHECKED_BF_READ_BLOCK_GOTO(index_descriptor, bucket, block, __ERROR);
+  CHECK(BF_ReadBlock(index_descriptor, bucket, &block), BF_READ_BLOCK_EMSG, return -1);
   bucket_info_t bucket_info = *(bucket_info_t *) block;
   int current_bucket = bucket;
   while (bucket_info.free_space < sizeof(Record)) {
     if (bucket_info.overflow_bucket != -1) {
-      CHECKED_BF_READ_BLOCK_GOTO(index_descriptor, bucket_info.overflow_bucket, block, __ERROR);
+      CHECK(BF_ReadBlock(index_descriptor, bucket_info.overflow_bucket, &block), BF_READ_BLOCK_EMSG, return -1);
       current_bucket = bucket_info.overflow_bucket;
       bucket_info = *(bucket_info_t *) block;
     } else {
-      CHECKED_BF_ALLOCATE_BLOCK_GOTO(index_descriptor, __ERROR);
-      CHECKED_BF_GET_BLOCK_COUNTER_GOTO(index_descriptor, bucket_info.overflow_bucket, __ERROR);
+      CHECK(BF_AllocateBlock(index_descriptor), BF_ALLOCATE_EMSG, return -1);
+      CHECK(bucket_info.overflow_bucket = BF_GetBlockCounter(index_descriptor) - 1, BF_GET_BLOCK_COUNTER_EMSG, return -1);
       memcpy(block, &bucket_info, sizeof(bucket_info_t));
-      CHECKED_BF_WRITE_BLOCK_GOTO(index_descriptor, current_bucket, __ERROR);
-      CHECKED_BF_READ_BLOCK_GOTO(index_descriptor, bucket_info.overflow_bucket, block, __ERROR);
+      CHECK(BF_WriteBlock(index_descriptor, current_bucket), BF_WRITE_BLOCK_EMSG, return -1);
+      CHECK(BF_ReadBlock(index_descriptor, bucket_info.overflow_bucket, &block), BF_READ_BLOCK_EMSG, return -1);
       current_bucket = bucket_info.overflow_bucket;
       initialize_block(block);
-      CHECKED_BF_WRITE_BLOCK_GOTO(header_info.index_descriptor, bucket_info.overflow_bucket, __ERROR);
+      CHECK(BF_WriteBlock(index_descriptor, bucket_info.overflow_bucket), BF_WRITE_BLOCK_EMSG, return -1);
       bucket_info = *(bucket_info_t *) block;
       break;
     }
@@ -184,14 +177,11 @@ int HT_InsertEntry(HT_info header_info, Record record) {
   bucket_info.free_space -= sizeof(Record);
   ++bucket_info.record_n;
   memcpy(block, &bucket_info, sizeof(bucket_info_t));
-  CHECKED_BF_WRITE_BLOCK_GOTO(index_descriptor, bucket, __ERROR);
+  CHECK(BF_WriteBlock(index_descriptor, bucket), BF_WRITE_BLOCK_EMSG, return -1);
   return current_bucket;
-__ERROR:
-  return -1;
 }
 
 int HT_DeleteEntry(HT_info header_info, void *value) {
-  int error;
   int id = *(int *) value;
   int index_descriptor = header_info.index_descriptor;
   int bucket = (int) hash_function(&header_info, value);
@@ -200,7 +190,7 @@ int HT_DeleteEntry(HT_info header_info, void *value) {
   void *block_base;
   bucket_info_t bucket_info;
   while (1U) {
-    CHECKED_BF_READ_BLOCK_GOTO(index_descriptor, bucket, block, __ERROR);
+    CHECK(BF_ReadBlock(index_descriptor, bucket, &block), BF_READ_BLOCK_EMSG, return -1);
     bucket_info = *(bucket_info_t *) block;
     block_base = block;
     block += sizeof(bucket_info_t);
@@ -208,7 +198,7 @@ int HT_DeleteEntry(HT_info header_info, void *value) {
       Record record = *(Record *) block;
       if (record.id == id) goto __SEARCH_END;
     }
-    if (bucket_info.overflow_bucket == -1) goto __ERROR;
+    if (bucket_info.overflow_bucket == -1) return -1;
     bucket = bucket_info.overflow_bucket;
   }
 __SEARCH_END:;
@@ -218,30 +208,25 @@ __SEARCH_END:;
   bucket_info.free_space += sizeof(Record);
   --bucket_info.record_n;
   memcpy(block_base, &bucket_info, sizeof(bucket_info_t));
-  CHECKED_BF_WRITE_BLOCK_GOTO(index_descriptor, bucket, __ERROR);
+  CHECK(BF_WriteBlock(index_descriptor, bucket), BF_WRITE_BLOCK_EMSG, return -1);
   return 0;
-__ERROR:
-  return error;
 }
 
 int HT_GetAllEntries(HT_info header_info, void *value) {
-  int error;
   int id = *(int *) value;
   int index_descriptor = header_info.index_descriptor;
   int bucket = (int) hash_function(&header_info, value);
   int blocks_read = 0U;
   do {
     void *block;
-    CHECKED_BF_READ_BLOCK_GOTO(index_descriptor, bucket, block, __ERROR);
+    CHECK(BF_ReadBlock(index_descriptor, bucket, &block), BF_READ_BLOCK_EMSG, return -1);
     bucket_info_t bucket_info = *(bucket_info_t *) block;
     block += sizeof(bucket_info_t);
     for (size_t i = 0U; i != bucket_info.record_n; ++i, block += sizeof(Record)) {
-      if (((Record*)block)->id == id) print_record(block);
+      if (((Record *) block)->id == id) print_record(block);
     }
     bucket = bucket_info.overflow_bucket;
     ++blocks_read;
   } while (bucket != -1);
   return blocks_read;
-__ERROR:
-  return error;
 }
