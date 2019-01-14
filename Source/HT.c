@@ -296,8 +296,8 @@ int SHT_CreateSecondaryIndex(char *secondary_index_name, char *attribute_name,
           .index_name = index_name
   };
 
-  size_t identifier_len = strlen(HT_FILE_IDENTIFIER);
-  memcpy(block, HT_FILE_IDENTIFIER, identifier_len);
+  size_t identifier_len = strlen(SHT_FILE_IDENTIFIER);
+  memcpy(block, SHT_FILE_IDENTIFIER, identifier_len);
 
   SHT_info_copy_to_block(&sht_info, block + identifier_len);
 

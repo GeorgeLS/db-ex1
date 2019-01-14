@@ -130,7 +130,7 @@ __NO_DISCARD int SHT_CloseSecondaryIndex(SHT_info* header_info) __NON_NULL(1);
  * @param record  The SecondaryRecord to be inserted.
  * @return On success returns 0, otherwise -1.
  */
-__NO_DISCARD int SHT_SecondaryInsertEntry(SHT_info header_info, SecondaryRecord record) __NON_NULL(1, 2);
+__NO_DISCARD int SHT_SecondaryInsertEntry(SHT_info header_info, SecondaryRecord record);
 
 
 #endif //HT_H
