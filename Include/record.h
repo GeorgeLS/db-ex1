@@ -10,6 +10,11 @@ typedef struct {
   char address[40];
 } Record;
 
+typedef struct {
+  Record record;
+  int blockId;
+} SecondaryRecord;
+
 /**
  * create_record - Creates a new record
  * @param id The id of the record

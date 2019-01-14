@@ -7,6 +7,7 @@
 
 #define HT_BLOCK_OVERFLOW -24
 #define HT_FILE_IDENTIFIER "STATIC_HASH_TABLE"
+#define SHT_FILE_IDENTIFIER "SECONDARY_STATIC_HASH_TABLE"
 
 typedef struct {
   int index_descriptor;
@@ -100,5 +101,36 @@ __NO_DISCARD int HT_GetAllEntries(HT_info header_info, void *value) __NON_NULL(2
  */
 __NO_DISCARD int SHT_CreateSecondaryIndex(char *secondary_index_name, char *attribute_name,
                                           int attribute_length, int bucket_n, char *index_name) __NON_NULL(1, 2, 5);
+
+/**
+ * SHT_OpenSecondaryIndex - Opens the secondary index file and reads it's info
+ * into a SHT_info object.
+ *
+ * @param sfileName A string of the secondary index file name.
+ * @return On Success returns a pointer to a SHT_info object, otherwise NULL.
+ */
+__NO_DISCARD SHT_info *SHT_OpenSecondaryIndex(char *sfileName) __NON_NULL(1);
+
+
+/**
+ * SHT_CloseIndex - Closes the index file associated with the file descriptor
+ * in the SHT_info object
+ * @param header_info A pointer to an SHT_info object
+ * @return On success returns 0
+ * On failure returns -1
+ */
+__NO_DISCARD int SHT_CloseSecondaryIndex(SHT_info* header_info) __NON_NULL(1);
+
+
+/**
+ * SHT_SecondaryInsertEntry - Inserts a new entry to the secondary index.
+ * the record must exist in the primary index.
+ *
+ * @param header_info  Info about the secondary index.
+ * @param record  The SecondaryRecord to be inserted.
+ * @return On success returns 0, otherwise -1.
+ */
+__NO_DISCARD int SHT_SecondaryInsertEntry(SHT_info header_info, SecondaryRecord record) __NON_NULL(1, 2);
+
 
 #endif //HT_H

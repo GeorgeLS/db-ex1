@@ -21,6 +21,7 @@ typedef struct {
   unsigned int record_n;
 } bucket_info_t;
 
+
 static __INLINE __NO_DISCARD inline
 bucket_info_t create_bucket_info(void) {
   return (bucket_info_t) {
@@ -30,6 +31,7 @@ bucket_info_t create_bucket_info(void) {
           .record_n = 0U
   };
 }
+
 
 static __INLINE inline
 uint64_t hash_function(char attribute_type, size_t bucket_n, const void *restrict value) {
@@ -52,6 +54,7 @@ uint64_t hash_function(char attribute_type, size_t bucket_n, const void *restric
   return hash_value + 1U;
 }
 
+
 static __INLINE inline
 void HT_info_copy_to_block(const HT_info *restrict const ht_info, void *restrict block) {
   memcpy(block, &ht_info->index_descriptor, sizeof(int));
@@ -64,6 +67,7 @@ void HT_info_copy_to_block(const HT_info *restrict const ht_info, void *restrict
   block += ht_info->attribute_length;
   memcpy(block, &ht_info->bucket_n, sizeof(unsigned long int));
 }
+
 
 static __INLINE inline
 void copy_block_to_HT_info(HT_info *restrict info, const void *restrict block) {
@@ -94,11 +98,31 @@ void SHT_info_copy_to_block(const SHT_info *restrict const sh_info, void *restri
   memcpy(block, &sh_info->index_name, sh_info->index_name_length);
 }
 
+
+static __INLINE inline
+void copy_block_to_SHT_info(SHT_info *restrict info, const void *restrict block) {
+  memcpy(&info->secondary_index_descriptor, block, sizeof(int));
+  block += sizeof(int);
+  memcpy(&info->attribute_length, block, sizeof(size_t));
+  block += sizeof(size_t);
+  info->attribute_name = __MALLOC(info->attribute_length + 1, char);
+  STR_COPY(info->attribute_name, block, info->attribute_length);
+  block += info->attribute_length;
+  memcpy(&info->bucket_n, block, sizeof(unsigned long int));
+  block += sizeof(unsigned long int);
+  memcpy(&info->index_name_length, block, sizeof(size_t));
+  block += sizeof(size_t);
+  info->index_name = __MALLOC(info->index_name_length + 1, char);
+  STR_COPY(info->index_name, block, info->index_name_length);
+}
+
+
 static __INLINE inline
 void initialize_block(void *block) {
   bucket_info_t bucket_info = create_bucket_info();
   memcpy(block, &bucket_info, sizeof(bucket_info_t));
 }
+
 
 int HT_CreateIndex(char *index_name, char attribute_type, char *attribute_name,
                    int attribute_length, int bucket_n) {
@@ -137,6 +161,7 @@ int HT_CreateIndex(char *index_name, char attribute_type, char *attribute_name,
   return 0;
 }
 
+
 HT_info *HT_OpenIndex(char *index_name) {
   int index_descriptor;
   CHECK(index_descriptor = BF_OpenFile(index_name), BF_OPEN_EMSG, return NULL);
@@ -153,6 +178,7 @@ HT_info *HT_OpenIndex(char *index_name) {
   return ht_info;
 }
 
+
 int HT_CloseIndex(HT_info *header_info) {
   if (header_info == NULL) return -1;
   CHECK(BF_CloseFile(header_info->index_descriptor), BF_CLOSE_EMSG, return -1);
@@ -160,6 +186,7 @@ int HT_CloseIndex(HT_info *header_info) {
   free(header_info);
   return 0;
 }
+
 
 int HT_InsertEntry(HT_info header_info, Record record) {
   int index_descriptor = header_info.index_descriptor;
@@ -196,6 +223,7 @@ int HT_InsertEntry(HT_info header_info, Record record) {
   return current_bucket;
 }
 
+
 int HT_DeleteEntry(HT_info header_info, void *value) {
   int id = *(int *) value;
   int index_descriptor = header_info.index_descriptor;
@@ -226,6 +254,7 @@ __SEARCH_END:;
   return 0;
 }
 
+
 int HT_GetAllEntries(HT_info header_info, void *value) {
   int id = *(int *) value;
   int index_descriptor = header_info.index_descriptor;
@@ -244,6 +273,7 @@ int HT_GetAllEntries(HT_info header_info, void *value) {
   } while (bucket != -1);
   return blocks_read;
 }
+
 
 int SHT_CreateSecondaryIndex(char *secondary_index_name, char *attribute_name,
                              int attribute_length, int bucket_n, char *index_name) {
@@ -282,3 +312,36 @@ int SHT_CreateSecondaryIndex(char *secondary_index_name, char *attribute_name,
   CHECK(BF_CloseFile(secondary_index_descriptor), BF_CLOSE_EMSG, return -1);
   return 0;
 }
+
+
+SHT_info* SHT_OpenSecondaryIndex(char *sfileName) {
+  int sfd;  // Secondary index file decriptor.
+  CHECK(sfd = BF_OpenFile(sfileName), BF_OPEN_EMSG, return NULL);
+
+  void *block;
+  CHECK(BF_ReadBlock(sfd, 0, &block), BF_READ_BLOCK_EMSG, return NULL);
+
+  size_t identifier_len = strlen(SHT_FILE_IDENTIFIER);
+  if (memcmp(block, SHT_FILE_IDENTIFIER, identifier_len) != 0) return NULL;
+
+  SHT_info *sht_info = __MALLOC(1, SHT_info);
+  if (sht_info == NULL) return NULL;
+  copy_block_to_SHT_info(sht_info, block + identifier_len);
+  return sht_info;
+}
+
+
+int SHT_CloseSecondaryIndex(SHT_info* header_info) {
+  if (header_info == NULL) return -1;
+  CHECK(BF_CloseFile(header_info->secondary_index_descriptor), BF_CLOSE_EMSG, return -1);
+  free(header_info->attribute_name);
+  free(header_info->index_name);
+  free(header_info);
+  return 0;
+}
+
+
+int SHT_SecondaryInsertEntry(SHT_info header_info, SecondaryRecord record) {
+
+}
+
