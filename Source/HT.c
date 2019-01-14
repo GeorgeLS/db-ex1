@@ -341,7 +341,38 @@ int SHT_CloseSecondaryIndex(SHT_info* header_info) {
 }
 
 
-int SHT_SecondaryInsertEntry(SHT_info header_info, SecondaryRecord record) {
-
+int SHT_SecondaryInsertEntry(SHT_info header_info, SecondaryRecord sRecord) {
+  int sfd = header_info.secondary_index_descriptor;
+  int bucket = (int) hash_function('c', header_info.bucket_n, &sRecord.record.name);
+  void *block;
+  CHECK(BF_ReadBlock(sfd, bucket, &block), BF_READ_BLOCK_EMSG, return -1);
+  bucket_info_t bucket_info = *(bucket_info_t *) block;
+  int current_bucket = bucket;
+  while (bucket_info.free_space < sizeof(SecondaryRecord)) {
+    if (bucket_info.overflow_bucket != -1) {
+      CHECK(BF_ReadBlock(sfd, bucket_info.overflow_bucket, &block), BF_READ_BLOCK_EMSG, return -1);
+      current_bucket = bucket_info.overflow_bucket;
+      bucket_info = *(bucket_info_t *) block;
+    } else {
+      CHECK(BF_AllocateBlock(sfd), BF_ALLOCATE_EMSG, return -1);
+      CHECK(bucket_info.overflow_bucket = BF_GetBlockCounter(sfd) - 1, BF_GET_BLOCK_COUNTER_EMSG,
+            return -1);
+      memcpy(block, &bucket_info, sizeof(bucket_info_t));
+      CHECK(BF_WriteBlock(sfd, current_bucket), BF_WRITE_BLOCK_EMSG, return -1);
+      CHECK(BF_ReadBlock(sfd, bucket_info.overflow_bucket, &block), BF_READ_BLOCK_EMSG, return -1);
+      current_bucket = bucket_info.overflow_bucket;
+      initialize_block(block);
+      CHECK(BF_WriteBlock(sfd, bucket_info.overflow_bucket), BF_WRITE_BLOCK_EMSG, return -1);
+      bucket_info = *(bucket_info_t *) block;
+      break;
+    }
+  }
+  memcpy(block + bucket_info.next_record, &sRecord, sizeof(SecondaryRecord));
+  bucket_info.next_record += sizeof(SecondaryRecord);
+  bucket_info.free_space -= sizeof(SecondaryRecord);
+  ++bucket_info.record_n;
+  memcpy(block, &bucket_info, sizeof(bucket_info_t));
+  CHECK(BF_WriteBlock(sfd, bucket), BF_WRITE_BLOCK_EMSG, return -1);
+  return current_bucket;
 }
 
