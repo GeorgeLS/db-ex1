@@ -21,6 +21,12 @@ typedef struct {
   unsigned int record_n;
 } bucket_info_t;
 
+typedef struct {
+  int id;
+  int block_id;
+  size_t secondary_key_len;
+  char *secondary_key;
+} SHT_insert_info;
 
 static __INLINE __NO_DISCARD inline
 bucket_info_t create_bucket_info(void) {
@@ -31,7 +37,6 @@ bucket_info_t create_bucket_info(void) {
           .record_n = 0U
   };
 }
-
 
 static __INLINE inline
 uint64_t hash_function(char attribute_type, size_t bucket_n, const void *restrict value) {
@@ -54,7 +59,6 @@ uint64_t hash_function(char attribute_type, size_t bucket_n, const void *restric
   return hash_value + 1U;
 }
 
-
 static __INLINE inline
 void HT_info_copy_to_block(const HT_info *restrict const ht_info, void *restrict block) {
   memcpy(block, &ht_info->index_descriptor, sizeof(int));
@@ -67,7 +71,6 @@ void HT_info_copy_to_block(const HT_info *restrict const ht_info, void *restrict
   block += ht_info->attribute_length;
   memcpy(block, &ht_info->bucket_n, sizeof(unsigned long int));
 }
-
 
 static __INLINE inline
 void copy_block_to_HT_info(HT_info *restrict info, const void *restrict block) {
@@ -89,15 +92,14 @@ void SHT_info_copy_to_block(const SHT_info *restrict const sh_info, void *restri
   block += sizeof(int);
   memcpy(block, &sh_info->attribute_length, sizeof(size_t));
   block += sizeof(size_t);
-  memcpy(block, &sh_info->attribute_name, sh_info->attribute_length);
+  memcpy(block, sh_info->attribute_name, sh_info->attribute_length);
   block += sh_info->attribute_length;
   memcpy(block, &sh_info->bucket_n, sizeof(unsigned long int));
   block += sizeof(unsigned long int);
   memcpy(block, &sh_info->index_name_length, sizeof(size_t));
   block += sizeof(size_t);
-  memcpy(block, &sh_info->index_name, sh_info->index_name_length);
+  memcpy(block, sh_info->index_name, sh_info->index_name_length);
 }
-
 
 static __INLINE inline
 void copy_block_to_SHT_info(SHT_info *restrict info, const void *restrict block) {
@@ -116,6 +118,28 @@ void copy_block_to_SHT_info(SHT_info *restrict info, const void *restrict block)
   STR_COPY(info->index_name, block, info->index_name_length);
 }
 
+static __INLINE inline
+void SHT_insert_info_copy_to_block(const SHT_insert_info *restrict const info, void *restrict block) {
+  memcpy(block, &info->id, sizeof(int));
+  block += sizeof(int);
+  memcpy(block, &info->block_id, sizeof(int));
+  block += sizeof(int);
+  memcpy(block, &info->secondary_key_len, sizeof(size_t));
+  block += sizeof(size_t);
+  memcpy(block, info->secondary_key, info->secondary_key_len);
+}
+
+static __INLINE inline
+void copy_block_to_SHT_insert_info(SHT_insert_info *restrict info, const void *restrict block) {
+  memcpy(&info->id, block, sizeof(int));
+  block += sizeof(int);
+  memcpy(&info->block_id, block, sizeof(int));
+  block += sizeof(int);
+  memcpy(&info->secondary_key_len, block, sizeof(size_t));
+  block += sizeof(size_t);
+  info->secondary_key = __MALLOC(info->secondary_key_len + 1, char);
+  STR_COPY(info->secondary_key, block, info->secondary_key_len);
+}
 
 static __INLINE inline
 void initialize_block(void *block) {
@@ -187,10 +211,27 @@ int HT_CloseIndex(HT_info *header_info) {
   return 0;
 }
 
+void *get_hash_attribute(char attribute_type, const char *attribute_name, size_t len, Record *record) {
+  void *hash_attribute;
+  if (attribute_type == 'c') {
+    if (!strncmp(attribute_name, "name", len)) {
+      hash_attribute = record->name;
+    } else if (!strncmp(attribute_name, "surname", len)) {
+      hash_attribute = record->surname;
+    } else if (!strncmp(attribute_name, "address", len)) {
+      hash_attribute = record->address;
+    } else return NULL;
+  } else if (attribute_type == 'i') {
+    hash_attribute = &record->id;
+  } else return NULL;
+  return hash_attribute;
+}
 
 int HT_InsertEntry(HT_info header_info, Record record) {
   int index_descriptor = header_info.index_descriptor;
-  int bucket = (int) hash_function(header_info.attribute_type, header_info.bucket_n, &record.id);
+  void *hash_attribute = get_hash_attribute(header_info.attribute_type, header_info.attribute_name,
+                                            header_info.attribute_length, &record);
+  int bucket = (int) hash_function(header_info.attribute_type, header_info.bucket_n, hash_attribute);
   void *block;
   CHECK(BF_ReadBlock(index_descriptor, bucket, &block), BF_READ_BLOCK_EMSG, return -1);
   bucket_info_t bucket_info = *(bucket_info_t *) block;
@@ -223,25 +264,47 @@ int HT_InsertEntry(HT_info header_info, Record record) {
   return current_bucket;
 }
 
-
 int HT_DeleteEntry(HT_info header_info, void *value) {
-  int id = *(int *) value;
   int index_descriptor = header_info.index_descriptor;
   int bucket = (int) hash_function(header_info.attribute_type, header_info.bucket_n, value);
   size_t i;
   void *block;
   void *block_base;
   bucket_info_t bucket_info;
-  while (1U) {
-    CHECK(BF_ReadBlock(index_descriptor, bucket, &block), BF_READ_BLOCK_EMSG, return -1);
-    bucket_info = *(bucket_info_t *) block;
-    block_base = block;
-    block += sizeof(bucket_info_t);
-    for (i = 0U; i != bucket_info.record_n; ++i, block += sizeof(Record)) {
-      if (((Record *) block)->id == id) goto __SEARCH_END;
+  if (header_info.attribute_type == 'c') {
+    size_t field_offset;
+    if (!strncmp(header_info.attribute_name, "name", header_info.attribute_length)) {
+      field_offset = offsetof(Record, name);
+    } else if (!strncmp(header_info.attribute_name, "surname", header_info.attribute_length)) {
+      field_offset = offsetof(Record, surname);
+    } else {
+      field_offset = offsetof(Record, address);
     }
-    if (bucket_info.overflow_bucket == -1) return -1;
-    bucket = bucket_info.overflow_bucket;
+    while (1U) {
+      CHECK(BF_ReadBlock(index_descriptor, bucket, &block), BF_READ_BLOCK_EMSG, return -1);
+      bucket_info = *(bucket_info_t *) block;
+      block_base = block;
+      block += sizeof(bucket_info_t);
+      for (i = 0U; i != bucket_info.record_n; ++i, block += sizeof(Record)) {
+        char *key = ((char *) (block + field_offset));
+        if (!strncmp(key, value, strlen(value))) goto __SEARCH_END;
+      }
+      if (bucket_info.overflow_bucket == -1) return -1;
+      bucket = bucket_info.overflow_bucket;
+    }
+  } else {
+    while (1U) {
+      CHECK(BF_ReadBlock(index_descriptor, bucket, &block), BF_READ_BLOCK_EMSG, return -1);
+      bucket_info = *(bucket_info_t *) block;
+      block_base = block;
+      block += sizeof(bucket_info_t);
+      for (i = 0U; i != bucket_info.record_n; ++i, block += sizeof(Record)) {
+        int id = *(int *) value;
+        if (((Record *) block)->id == id) goto __SEARCH_END;
+      }
+      if (bucket_info.overflow_bucket == -1) return -1;
+      bucket = bucket_info.overflow_bucket;
+    }
   }
 __SEARCH_END:;
   size_t remaining_records = bucket_info.record_n - i - 1;
@@ -254,26 +317,47 @@ __SEARCH_END:;
   return 0;
 }
 
-
 int HT_GetAllEntries(HT_info header_info, void *value) {
-  int id = *(int *) value;
   int index_descriptor = header_info.index_descriptor;
   int bucket = (int) hash_function(header_info.attribute_type, header_info.bucket_n, value);
   int blocks_read = 0U;
-  do {
-    void *block;
-    CHECK(BF_ReadBlock(index_descriptor, bucket, &block), BF_READ_BLOCK_EMSG, return -1);
-    bucket_info_t bucket_info = *(bucket_info_t *) block;
-    block += sizeof(bucket_info_t);
-    for (size_t i = 0U; i != bucket_info.record_n; ++i, block += sizeof(Record)) {
-      if (((Record *) block)->id == id) print_record(block);
+  if (header_info.attribute_type == 'c') {
+    size_t field_offset;
+    if (!strncmp(header_info.attribute_name, "name", header_info.attribute_length)) {
+      field_offset = offsetof(Record, name);
+    } else if (!strncmp(header_info.attribute_name, "surname", header_info.attribute_length)) {
+      field_offset = offsetof(Record, surname);
+    } else {
+      field_offset = offsetof(Record, address);
     }
-    bucket = bucket_info.overflow_bucket;
-    ++blocks_read;
-  } while (bucket != -1);
+    do {
+      void *block;
+      CHECK(BF_ReadBlock(index_descriptor, bucket, &block), BF_READ_BLOCK_EMSG, return -1);
+      bucket_info_t bucket_info = *(bucket_info_t *) block;
+      block += sizeof(bucket_info_t);
+      for (size_t i = 0U; i != bucket_info.record_n; ++i, block += sizeof(Record)) {
+        char *key = ((char *) (block + field_offset));
+        if (!strncmp(key, value, strlen(value))) print_record(block);
+      }
+      bucket = bucket_info.overflow_bucket;
+      ++blocks_read;
+    } while (bucket != -1);
+  } else {
+    do {
+      void *block;
+      CHECK(BF_ReadBlock(index_descriptor, bucket, &block), BF_READ_BLOCK_EMSG, return -1);
+      bucket_info_t bucket_info = *(bucket_info_t *) block;
+      block += sizeof(bucket_info_t);
+      for (size_t i = 0U; i != bucket_info.record_n; ++i, block += sizeof(Record)) {
+        int id = *(int *) value;
+        if (((Record *) block)->id == id) print_record(block);
+      }
+      bucket = bucket_info.overflow_bucket;
+      ++blocks_read;
+    } while (bucket != -1);
+  }
   return blocks_read;
 }
-
 
 int SHT_CreateSecondaryIndex(char *secondary_index_name, char *attribute_name,
                              int attribute_length, int bucket_n, char *index_name) {
@@ -313,8 +397,7 @@ int SHT_CreateSecondaryIndex(char *secondary_index_name, char *attribute_name,
   return 0;
 }
 
-
-SHT_info* SHT_OpenSecondaryIndex(char *sfileName) {
+SHT_info *SHT_OpenSecondaryIndex(char *sfileName) {
   int sfd;  // Secondary index file decriptor.
   CHECK(sfd = BF_OpenFile(sfileName), BF_OPEN_EMSG, return NULL);
 
@@ -330,8 +413,7 @@ SHT_info* SHT_OpenSecondaryIndex(char *sfileName) {
   return sht_info;
 }
 
-
-int SHT_CloseSecondaryIndex(SHT_info* header_info) {
+int SHT_CloseSecondaryIndex(SHT_info *header_info) {
   if (header_info == NULL) return -1;
   CHECK(BF_CloseFile(header_info->secondary_index_descriptor), BF_CLOSE_EMSG, return -1);
   free(header_info->attribute_name);
@@ -340,15 +422,17 @@ int SHT_CloseSecondaryIndex(SHT_info* header_info) {
   return 0;
 }
 
-
 int SHT_SecondaryInsertEntry(SHT_info header_info, SecondaryRecord sRecord) {
   int sfd = header_info.secondary_index_descriptor;
-  int bucket = (int) hash_function('c', header_info.bucket_n, &sRecord.record.name);
+  char *hash_attribute = get_hash_attribute('c', header_info.attribute_name, header_info.attribute_length,
+                                            &sRecord.record);
+  if (hash_attribute == NULL) return -1;
+  int bucket = (int) hash_function('c', header_info.bucket_n, hash_attribute);
   void *block;
   CHECK(BF_ReadBlock(sfd, bucket, &block), BF_READ_BLOCK_EMSG, return -1);
   bucket_info_t bucket_info = *(bucket_info_t *) block;
   int current_bucket = bucket;
-  while (bucket_info.free_space < sizeof(SecondaryRecord)) {
+  while (bucket_info.free_space < sizeof(SHT_insert_info)) {
     if (bucket_info.overflow_bucket != -1) {
       CHECK(BF_ReadBlock(sfd, bucket_info.overflow_bucket, &block), BF_READ_BLOCK_EMSG, return -1);
       current_bucket = bucket_info.overflow_bucket;
@@ -367,12 +451,22 @@ int SHT_SecondaryInsertEntry(SHT_info header_info, SecondaryRecord sRecord) {
       break;
     }
   }
-  memcpy(block + bucket_info.next_record, &sRecord, sizeof(SecondaryRecord));
-  bucket_info.next_record += sizeof(SecondaryRecord);
-  bucket_info.free_space -= sizeof(SecondaryRecord);
+  SHT_insert_info insert_info = {
+          .id = sRecord.record.id,
+          .block_id = sRecord.blockId,
+          .secondary_key_len = strlen(hash_attribute),
+          .secondary_key = hash_attribute
+  };
+  size_t insert_info_size = offsetof(SHT_insert_info, secondary_key) + insert_info.secondary_key_len;
+  SHT_insert_info_copy_to_block(&insert_info, block + bucket_info.next_record);
+  bucket_info.next_record += insert_info_size;
+  bucket_info.free_space -= insert_info_size;
   ++bucket_info.record_n;
   memcpy(block, &bucket_info, sizeof(bucket_info_t));
   CHECK(BF_WriteBlock(sfd, bucket), BF_WRITE_BLOCK_EMSG, return -1);
   return current_bucket;
 }
 
+int SHT_SecondaryGetAllEntries(SHT_info sht_info, HT_info ht_info) {
+
+}

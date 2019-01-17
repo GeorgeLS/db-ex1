@@ -111,7 +111,6 @@ __NO_DISCARD int SHT_CreateSecondaryIndex(char *secondary_index_name, char *attr
  */
 __NO_DISCARD SHT_info *SHT_OpenSecondaryIndex(char *sfileName) __NON_NULL(1);
 
-
 /**
  * SHT_CloseIndex - Closes the index file associated with the file descriptor
  * in the SHT_info object
@@ -119,8 +118,7 @@ __NO_DISCARD SHT_info *SHT_OpenSecondaryIndex(char *sfileName) __NON_NULL(1);
  * @return On success returns 0
  * On failure returns -1
  */
-__NO_DISCARD int SHT_CloseSecondaryIndex(SHT_info* header_info) __NON_NULL(1);
-
+__NO_DISCARD int SHT_CloseSecondaryIndex(SHT_info *header_info) __NON_NULL(1);
 
 /**
  * SHT_SecondaryInsertEntry - Inserts a new entry to the secondary index.
@@ -132,5 +130,13 @@ __NO_DISCARD int SHT_CloseSecondaryIndex(SHT_info* header_info) __NON_NULL(1);
  */
 __NO_DISCARD int SHT_SecondaryInsertEntry(SHT_info header_info, SecondaryRecord record);
 
+/**
+ * SHT_SecondaryGetAllEntries -
+ * @param sht_info The secondary header info
+ * @param ht_info The primary header info
+ * @return On success returns the number of blocks read until we found all the records
+ * On failure returns -1
+ */
+__NO_DISCARD int SHT_SecondaryGetAllEntries(SHT_info sht_info, HT_info ht_info);
 
 #endif //HT_H
