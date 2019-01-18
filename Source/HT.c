@@ -190,7 +190,7 @@ int HT_InsertEntry(HT_info header_info, Record record) {
   bucket_info.free_space -= sizeof(Record);
   ++bucket_info.record_n;
   memcpy(block, &bucket_info, sizeof(bucket_info_t));
-  CHECK(BF_WriteBlock(index_descriptor, bucket), BF_WRITE_BLOCK_EMSG, return -1);
+  CHECK(BF_WriteBlock(index_descriptor, current_bucket), BF_WRITE_BLOCK_EMSG, return -1);
   return current_bucket;
 }
 
@@ -256,7 +256,10 @@ int HT_GetAllEntries(HT_info header_info, void *value) {
       block += sizeof(bucket_info_t);
       for (size_t i = 0U; i != bucket_info.record_n; ++i, block += sizeof(Record)) {
         char *key = ((char *) (block + field_offset));
-        if (!strncmp(key, value, value_len)) { found = 1; print_record(block); }
+        if (!strncmp(key, value, value_len)) {
+          found = 1;
+          print_record(block);
+        }
       }
       bucket = bucket_info.overflow_bucket;
       ++blocks_read;
@@ -269,7 +272,10 @@ int HT_GetAllEntries(HT_info header_info, void *value) {
       bucket_info_t bucket_info = *(bucket_info_t *) block;
       block += sizeof(bucket_info_t);
       for (size_t i = 0U; i != bucket_info.record_n; ++i, block += sizeof(Record)) {
-        if (((Record *) block)->id == id) { found = 1; print_record(block); }
+        if (((Record *) block)->id == id) {
+          found = 1;
+          print_record(block);
+        }
       }
       bucket = bucket_info.overflow_bucket;
       ++blocks_read;
@@ -390,7 +396,7 @@ int SHT_SecondaryInsertEntry(SHT_info header_info, SecondaryRecord sRecord) {
   bucket_info.free_space -= insert_info_size;
   ++bucket_info.record_n;
   memcpy(block, &bucket_info, sizeof(bucket_info_t));
-  CHECK(BF_WriteBlock(sfd, bucket), BF_WRITE_BLOCK_EMSG, return -1);
+  CHECK(BF_WriteBlock(sfd, current_bucket), BF_WRITE_BLOCK_EMSG, return -1);
   return current_bucket;
 }
 
