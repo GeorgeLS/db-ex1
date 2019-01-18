@@ -21,12 +21,11 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdlib.h>
-#include "BF.h"
-#include "HT.h"
+#include "Include/BF.h"
+#include "Include/HT.h"
 
 
-
-int main(char argc,char** argv)
+int main(int argc,char** argv)
 {
 	/*
 	How many records to use for the  test.

@@ -10,19 +10,19 @@
 #define SHT_FILE_IDENTIFIER "SECONDARY_STATIC_HASH_TABLE"
 
 typedef struct {
-  int index_descriptor;
-  char attribute_type;
-  size_t attribute_length;
-  char *attribute_name;
-  unsigned long int bucket_n;
+  int fileDesc;
+  char attrType;
+  size_t attrLength;
+  char *attrName;
+  unsigned long int numBuckets;
 } HT_info;
 
 typedef struct {
-  int secondary_index_descriptor;
-  size_t attribute_length;
-  char *attribute_name;
-  unsigned long int bucket_n;
-  char *index_name;
+  int fileDesc;
+  size_t attrLength;
+  unsigned long int numBuckets;
+  char *attrName;
+  char *fileName;
 } SHT_info;
 
 /**

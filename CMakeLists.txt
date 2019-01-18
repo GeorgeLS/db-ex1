@@ -4,7 +4,7 @@ project(db_ex1 C)
 set(CMAKE_C_STANDARD 11)
 
 add_executable(db_ex1
-        Source/main.c Source/HT.c Include/macros.h
+        ht_main_test.c Source/HT.c Include/macros.h
         Include/attributes.h
         Include/record.h Source/record.c)
 
