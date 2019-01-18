@@ -22,7 +22,6 @@ typedef struct {
   size_t attribute_length;
   char *attribute_name;
   unsigned long int bucket_n;
-  size_t index_name_length;
   char *index_name;
 } SHT_info;
 
