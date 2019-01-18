@@ -107,7 +107,7 @@ int HT_CreateIndex(char *index_name, char attribute_type, char *attribute_name,
   memcpy(block, HT_FILE_IDENTIFIER, identifier_len);
   block += identifier_len;
 
-  HT_info *info = (HT_info*) block;
+  HT_info *info = (HT_info *) block;
   info->index_descriptor = index_descriptor;
   info->attribute_type = attribute_type;
   info->attribute_length = (size_t) attribute_length;
@@ -137,7 +137,7 @@ HT_info *HT_OpenIndex(char *index_name) {
   if (memcmp(block, HT_FILE_IDENTIFIER, identifier_len) != 0) return NULL;
   block += identifier_len;
 
-  HT_info *info = (HT_info *)block;
+  HT_info *info = (HT_info *) block;
   HT_info *ht_info = __MALLOC(1, HT_info);
   if (ht_info == NULL) return NULL;
   ht_info->index_descriptor = info->index_descriptor;
@@ -202,6 +202,7 @@ int HT_DeleteEntry(HT_info header_info, void *value) {
   bucket_info_t bucket_info;
   size_t i;
   if (header_info.attribute_type == 'c') {
+    size_t value_len = strlen(value);
     size_t field_offset = get_attribute_offset(header_info.attribute_name, header_info.attribute_length);
     while (1U) {
       CHECK(BF_ReadBlock(index_descriptor, bucket, &block), BF_READ_BLOCK_EMSG, return -1);
@@ -210,7 +211,7 @@ int HT_DeleteEntry(HT_info header_info, void *value) {
       block += sizeof(bucket_info_t);
       for (i = 0U; i != bucket_info.record_n; ++i, block += sizeof(Record)) {
         char *key = ((char *) (block + field_offset));
-        if (!strncmp(key, value, strlen(value))) goto __SEARCH_END;
+        if (!strncmp(key, value, value_len)) goto __SEARCH_END;
       }
       if (bucket_info.overflow_bucket == -1) return -1;
       bucket = bucket_info.overflow_bucket;
@@ -243,8 +244,9 @@ __SEARCH_END:;
 int HT_GetAllEntries(HT_info header_info, void *value) {
   int index_descriptor = header_info.index_descriptor;
   int bucket = (int) hash_function(header_info.attribute_type, header_info.bucket_n, value);
-  int blocks_read = 0U;
+  int blocks_read = 0;
   if (header_info.attribute_type == 'c') {
+    size_t value_len = strlen(value);
     size_t field_offset = get_attribute_offset(header_info.attribute_name, header_info.attribute_length);
     do {
       void *block;
@@ -253,7 +255,7 @@ int HT_GetAllEntries(HT_info header_info, void *value) {
       block += sizeof(bucket_info_t);
       for (size_t i = 0U; i != bucket_info.record_n; ++i, block += sizeof(Record)) {
         char *key = ((char *) (block + field_offset));
-        if (!strncmp(key, value, strlen(value))) print_record(block);
+        if (!strncmp(key, value, value_len)) print_record(block);
       }
       bucket = bucket_info.overflow_bucket;
       ++blocks_read;
@@ -380,7 +382,7 @@ int SHT_SecondaryInsertEntry(SHT_info header_info, SecondaryRecord sRecord) {
   insert_info->block_id = sRecord.blockId;
   memcpy(&insert_info->value, hash_attribute, attribute_length);
   // That's the C we love!
-  *(char *)(void *)(&insert_info->value + attribute_length) = '\0';
+  *(char *) (void *) (&insert_info->value + attribute_length) = '\0';
 
   size_t insert_info_size = offsetof(SHT_insert_info, value) + attribute_length + 1;
   bucket_info.next_record += insert_info_size;
@@ -391,6 +393,46 @@ int SHT_SecondaryInsertEntry(SHT_info header_info, SecondaryRecord sRecord) {
   return current_bucket;
 }
 
-int SHT_SecondaryGetAllEntries(SHT_info sht_info, HT_info ht_info) {
+static int HT_PrintAllEntriesFromSHT(const HT_info *ht_info, int bucket, char *value) {
+  int index_descriptor = ht_info->index_descriptor;
+  int blocks_read = 0;
+  size_t value_len = strlen(value);
+  size_t field_offset = get_attribute_offset(ht_info->attribute_name, ht_info->attribute_length);
+  do {
+    void *block;
+    CHECK(BF_ReadBlock(index_descriptor, bucket, &block), BF_READ_BLOCK_EMSG, return -1);
+    bucket_info_t bucket_info = *(bucket_info_t *) block;
+    block += sizeof(bucket_info_t);
+    for (size_t i = 0U; i != bucket_info.record_n; ++i, block += sizeof(Record)) {
+      char *key = (char *) (block + field_offset);
+      if (!strncmp(key, value, value_len)) print_record(block);
+    }
+    bucket = bucket_info.overflow_bucket;
+    ++blocks_read;
+  } while (bucket != -1);
+  return blocks_read;
+}
 
+int SHT_SecondaryGetAllEntries(SHT_info sht_info, HT_info ht_info, void *value) {
+  int index_descriptor = sht_info.secondary_index_descriptor;
+  int bucket = (int) hash_function('c', sht_info.bucket_n, value);
+  int blocks_read = 0;
+  ht_info.attribute_type = 'c';
+  ht_info.attribute_name = sht_info.attribute_name;
+  do {
+    void *block;
+    CHECK(BF_ReadBlock(index_descriptor, bucket, &block), BF_READ_BLOCK_EMSG, return -1);
+    bucket_info_t bucket_info = *(bucket_info_t *) block;
+    block += sizeof(bucket_info_t);
+    for (size_t i = 0U; i != bucket_info.record_n; ++i) {
+      SHT_insert_info *insert_info = (SHT_insert_info *) block;
+      char *key = (char *) &insert_info->value;
+      if (!strncmp(key, value, strlen(value)))
+        blocks_read += HT_PrintAllEntriesFromSHT(&ht_info, insert_info->block_id, value);
+      block += offsetof(SHT_insert_info, value) + strlen(key) + 1;
+    }
+    bucket = bucket_info.overflow_bucket;
+    ++blocks_read;
+  } while (bucket != -1);
+  return blocks_read;
 }

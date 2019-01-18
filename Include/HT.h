@@ -136,6 +136,6 @@ __NO_DISCARD int SHT_SecondaryInsertEntry(SHT_info header_info, SecondaryRecord 
  * @return On success returns the number of blocks read until we found all the records
  * On failure returns -1
  */
-__NO_DISCARD int SHT_SecondaryGetAllEntries(SHT_info sht_info, HT_info ht_info);
+__NO_DISCARD int SHT_SecondaryGetAllEntries(SHT_info sht_info, HT_info ht_info, void *value) __NON_NULL(3);
 
 #endif //HT_H
