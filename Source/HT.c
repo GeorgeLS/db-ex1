@@ -436,3 +436,68 @@ int SHT_SecondaryGetAllEntries(SHT_info sht_info, HT_info ht_info, void *value) 
   } while (bucket != -1);
   return blocks_read;
 }
+
+int HashStatistics(char *filename) {
+  int fd;
+  CHECK(fd = BF_OpenFile(filename), BF_OPEN_EMSG, return -1);
+  void *block;
+  CHECK(BF_ReadBlock(fd, 0, &block), BF_READ_BLOCK_EMSG, return -1);
+  size_t ht_file_id_len = strlen(HT_FILE_IDENTIFIER);
+  size_t sht_file_id_len = strlen(SHT_FILE_IDENTIFIER);
+  int buckets;
+  if (!memcmp(block, HT_FILE_IDENTIFIER, ht_file_id_len)) {
+    block += ht_file_id_len;
+    buckets = (int) ((HT_info *) block)->bucket_n;
+  } else if (!memcmp(block, SHT_FILE_IDENTIFIER, sht_file_id_len)) {
+    block += sht_file_id_len;
+    buckets = (int) ((SHT_info *) block)->bucket_n;
+  } else return -1;
+  int total_blocks;
+  CHECK(total_blocks = BF_GetBlockCounter(fd), BF_GET_BLOCK_COUNTER_EMSG, return -1);
+  int total_records = 0;
+  int *bucket_overlfow_blocks = __MALLOC(buckets, int);
+  int min_records = BLOCK_SIZE / sizeof(Record) + 1;
+  int max_records = 0;
+  int buckets_with_overflow_blocks = 0U;
+  for (size_t i = 1U; i <= buckets; ++i) {
+    CHECK(BF_ReadBlock(fd, (int) i, &block), BF_READ_BLOCK_EMSG, {
+      free(bucket_overlfow_blocks);
+      return -1;
+    });
+    bucket_info_t bucket_info = *(bucket_info_t *) block;
+    if (bucket_info.record_n > max_records) max_records = bucket_info.record_n;
+    if (bucket_info.record_n < min_records) min_records = bucket_info.record_n;
+    total_records += bucket_info.record_n;
+    void *overflow_block;
+    if (bucket_info.overflow_bucket != -1) ++buckets_with_overflow_blocks;
+    while (bucket_info.overflow_bucket != -1) {
+      CHECK(BF_ReadBlock(fd, bucket_info.overflow_bucket, &overflow_block), BF_READ_BLOCK_EMSG, {
+        free(bucket_overlfow_blocks);
+        return -1;
+      });
+      ++bucket_overlfow_blocks[i - 1U];
+      bucket_info = *(bucket_info_t *) overflow_block;
+    }
+  }
+  printf("\n================================= HASH STATISTICS =================================\n");
+  printf("\tFile Blocks: %d\n"
+         "\tMinimum Records in a bucket: %d\n"
+         "\tMaximum Records in a bucket: %d\n"
+         "\tAverage Records in a bucket: %.2f\n"
+         "\tAverage number of Blocks per bucket: %.2f\n"
+         "\tNumber of buckets with overflow blocks: %d\n",
+         total_blocks, min_records, max_records,
+         (float) total_records / (float) buckets,
+         (float) total_blocks / (float) buckets,
+         buckets_with_overflow_blocks);
+  if (buckets_with_overflow_blocks) {
+    printf("Overflow Blocks in buckets:\n");
+    for (size_t i = 0U; i != buckets_with_overflow_blocks; ++i) {
+      if (bucket_overlfow_blocks[i]) {
+        printf("\tBucket[%zu]: %d\n", i + 1, bucket_overlfow_blocks[i]);
+      }
+    }
+  }
+  free(bucket_overlfow_blocks);
+  return 0;
+}

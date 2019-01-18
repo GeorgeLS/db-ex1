@@ -138,4 +138,12 @@ __NO_DISCARD int SHT_SecondaryInsertEntry(SHT_info header_info, SecondaryRecord 
  */
 __NO_DISCARD int SHT_SecondaryGetAllEntries(SHT_info sht_info, HT_info ht_info, void *value) __NON_NULL(3);
 
+/**
+ * HashStatistics - Prints the the hash statistics about the file
+ * @param filename The file whose statistics will be printed
+ * @return On success returns 0.
+ * On failure returns -1.
+ */
+int HashStatistics(char *filename) __NON_NULL(1);
+
 #endif //HT_H

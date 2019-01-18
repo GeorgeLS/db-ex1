@@ -45,6 +45,7 @@ void test1(void) {
     BF_PrintError("Error closing file");
     exit(EXIT_FAILURE);
   }
+  HashStatistics(filename);
 }
 
 int main() {
