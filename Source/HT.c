@@ -42,12 +42,11 @@ uint64_t hash_function(char attribute_type, size_t bucket_n, const void *restric
   if (attribute_type == 'c') {
     size_t value_len = strlen(value);
     size_t double_words = value_len / sizeof(uint64_t);
-    for (size_t i = 0U; i != double_words; ++i) {
+    for (size_t i = 0U; i != double_words; ++i, value += sizeof(uint64_t)) {
       hash_value += *(uint64_t *) value;
-      value += sizeof(uint64_t);
     }
     size_t remaining_bytes = value_len % sizeof(uint64_t);
-    for (size_t i = 0U; i != remaining_bytes; ++i) {
+    for (size_t i = 0U; i != remaining_bytes; ++i, value += sizeof(uint8_t)) {
       hash_value += *(uint8_t *) value;
     }
     hash_value %= bucket_n;

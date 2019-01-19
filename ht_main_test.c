@@ -24,11 +24,10 @@
 #include "Include/BF.h"
 #include "Include/HT.h"
 
-
 int main(int argc, char **argv) {
   /*
-  How many records to use for the  test.
-  */
+How many records to use for the  test.
+*/
   int testRecordsNumber = atoi(argv[1]);
   /*
   The proportion for the deletes.
@@ -262,5 +261,6 @@ int main(int argc, char **argv) {
   HashStatistics(fileName);
   printf("Statistics:SHT\n");
   HashStatistics(sfileName);
+
   return 0;
 }   
